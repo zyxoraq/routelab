@@ -1,0 +1,10 @@
+{
+  "name": "routelab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A reproducible, dependency-free pathfinding laboratory.",
+  "scripts": {"start": "node server.mjs", "test": "node --test"},
+  "engines": {"node": ">=24"},
+  "license": "MIT"
+}

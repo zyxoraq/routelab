@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build a terrain. Trace a search. Understand the trade-off. A local pathfinding laboratory.">
+  <title>RouteLab — Find a better way</title><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="./" aria-label="RouteLab home"><span class="brand-mark">↗</span>route<span>lab</span><small>ALGORITHM STUDIO</small></a>
+    <div class="header-note"><span class="live-dot"></span> Runs entirely in your browser <span class="version">v1.0</span></div>
+  </header>
+  <main class="wrap">
+    <section class="intro">
+      <div><p class="eyebrow">EXPERIMENT 001 / PATHFINDING</p><h1>Every route has<br>a <em>trade-off.</em></h1></div>
+      <div class="intro-copy"><p>A shorter path isn't always a cheaper one.<br>Build a terrain, trace the search, and see why.</p><div class="intro-tags"><span>3 algorithms</span><span>4-way movement</span><span>Zero dependencies</span></div></div>
+    </section>
+    <section class="lab" aria-label="Pathfinding laboratory">
+      <aside class="controls">
+        <div class="panel-label"><span>01</span> SET THE RULES</div>
+        <label class="field-label" for="algorithm">Search algorithm</label>
+        <select id="algorithm"><option value="astar">A* search</option><option value="dijkstra">Dijkstra</option><option value="bfs">Breadth-first search</option></select>
+        <p id="algorithm-note" class="hint">Uses distance to the target to guide an optimal weighted search.</p>
+        <div class="divider"></div>
+        <div class="field-label">Paint the terrain</div>
+        <div class="tool-grid" role="group" aria-label="Terrain tools">
+          <button class="tool active" data-tool="wall" aria-pressed="true"><span class="swatch wall"></span>Wall <kbd>1</kbd></button>
+          <button class="tool" data-tool="weight" aria-pressed="false"><span class="swatch weight"></span>Weight <kbd>2</kbd></button>
+          <button class="tool" data-tool="erase" aria-pressed="false"><span class="swatch empty"></span>Erase <kbd>3</kbd></button>
+          <button class="tool" data-tool="start" aria-pressed="false"><span class="swatch start"></span>Start <kbd>4</kbd></button>
+          <button class="tool" data-tool="goal" aria-pressed="false"><span class="swatch goal"></span>Target <kbd>5</kbd></button>
+        </div>
+        <label class="field-label weight-control" for="weight">Terrain cost <output id="weight-value">5</output></label>
+        <input id="weight" type="range" min="2" max="9" value="5">
+        <p class="hint">Click or drag to paint. Each move pays the destination cell's cost.</p>
+        <div class="divider"></div>
+        <label class="field-label" for="seed">Reproducible maze</label>
+        <div class="seed-row"><input id="seed" value="copper-fox" maxlength="80" aria-label="Maze seed"><button id="maze" class="icon-button" title="Generate maze" aria-label="Generate maze">↻</button></div>
+        <div class="mini-actions"><button id="demo">Load demo</button><button id="clear">Clear board</button></div>
+        <div class="divider"></div>
+        <div class="mini-actions"><button id="export">↓ Export JSON</button><button id="import">↑ Import JSON</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+      </aside>
+      <div class="workspace">
+        <div class="board-heading"><div><span class="panel-label">02 / EXPLORE THE GRID</span><h2 id="scenario-name">The expensive shortcut</h2></div><span class="grid-size" id="grid-size">31 × 21</span></div>
+        <div class="canvas-wrap"><canvas id="board" width="930" height="630" tabindex="0" aria-label="Editable pathfinding grid. Use arrow keys to select a cell and Enter to paint using the selected tool. S and T mark start and target."></canvas></div>
+        <div class="board-footer"><div class="legend"><span><i class="start"></i>Start</span><span><i class="goal"></i>Target</span><span><i class="visited"></i>Explored</span><span><i class="route"></i>Route</span></div><span id="cursor-label" class="cursor-label">Arrow keys + Enter also work</span></div>
+        <div class="playback">
+          <button id="run" class="primary"><span>▶</span> Run search</button><button id="step" class="secondary">Step →</button><button id="reset" class="icon-button" title="Reset search" aria-label="Reset search">↺</button>
+          <label class="speed" for="speed">Replay speed<input id="speed" type="range" min="1" max="30" value="8"><span id="speed-value">8×</span></label>
+        </div>
+        <div class="status-row"><span class="live-dot"></span><p id="status" role="status" aria-live="polite">Ready. Try A*, then compare with breadth-first search.</p></div>
+      </div>
+    </section>
+    <section class="results" aria-label="Search results">
+      <div class="result-card"><span class="stat-label">ROUTE COST</span><strong id="cost">—</strong><span class="stat-detail">Sum of entered cell costs</span></div>
+      <div class="result-card"><span class="stat-label">PATH LENGTH</span><strong id="steps">—</strong><span class="stat-detail">Moves from start to target</span></div>
+      <div class="result-card"><span class="stat-label">NODES EXPLORED</span><strong id="explored">0</strong><span class="stat-detail">Unique cells removed from the frontier</span></div>
+      <div class="result-card insight"><span class="stat-label">THE KEY IDEA</span><p id="insight">A* balances the cost so far with an estimate of the distance left.</p></div>
+    </section>
+    <section class="comparison">
+      <div class="comparison-heading"><div><p class="eyebrow">SAME BOARD. DIFFERENT STRATEGIES.</p><h2>Put them side by side.</h2><p>Computed from your current grid. BFS minimizes moves; Dijkstra and A* minimize terrain cost.</p></div><button id="compare" class="secondary">Compare all three ↗</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Algorithm</th><th>Route cost</th><th>Moves</th><th>Explored</th><th>Guarantee</th></tr></thead><tbody id="comparison-body"><tr><td>A* search</td><td>—</td><td>—</td><td>—</td><td>Lowest weighted cost</td></tr><tr><td>Dijkstra</td><td>—</td><td>—</td><td>—</td><td>Lowest weighted cost</td></tr><tr><td>Breadth-first</td><td>—</td><td>—</td><td>—</td><td>Fewest moves</td></tr></tbody></table></div>
+      <p class="comparison-note" id="comparison-note">Compare route cost, number of moves, and explored cells on the same terrain.</p>
+    </section>
+  </main>
+  <footer class="wrap"><span>RouteLab / a small laboratory for better questions.</span><span>LOCAL FIRST · OPEN SOURCE · MIT</span></footer>
+  <script type="module" src="app.mjs"></script>
+</body></html>

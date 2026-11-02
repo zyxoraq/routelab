@@ -1,4 +1,6 @@
 import { solve, createDemo, createMaze, validateBoard } from './src/pathfinding.mjs';
+import { BoardHistory } from './src/history.mjs';
+import { createScenarioStorage } from './src/persistence.mjs';
 
 const $ = id => document.getElementById(id);
 const canvas = $('board'), ctx = canvas.getContext('2d');
@@ -13,7 +15,11 @@ const insights = {
   dijkstra: 'Dijkstra guarantees the cheapest route, even when a longer route costs less.',
   bfs: 'BFS finds the fewest moves. On weighted terrain that can be an expensive shortcut.',
 };
-let board = createDemo(), selectedTool = 'wall', cursor = board.start, drawing = false;
+const scenarioStorage = createScenarioStorage();
+const savedScenario = scenarioStorage.load();
+let board = savedScenario.board ?? createDemo(), selectedTool = 'wall', cursor = board.start, drawing = false;
+const history = new BoardHistory(board);
+let activePointer = null;
 let result = null, position = 0, running = false, frame = 0, lastTime = 0;
 let explored = new Set(), compared = false;
 const unit = 30;
@@ -21,6 +27,51 @@ const unit = 30;
 function status(message, isError = false) {
   $('status').textContent = message;
   $('status').parentElement.classList.toggle('error', isError);
+}
+
+function updateHistoryControls() {
+  $('undo').disabled = !history.canUndo;
+  $('redo').disabled = !history.canRedo;
+}
+
+function storageStatus(state, message) {
+  $('storage-status').dataset.state = state;
+  $('storage-status').textContent = message;
+}
+
+function saveBoard() {
+  const { status: state } = scenarioStorage.save(board);
+  storageStatus(state, state === 'saved'
+    ? 'Board saved in this browser.'
+    : 'Autosave unavailable. Your board is still open; export JSON to keep it.');
+}
+
+function finishStroke() {
+  if (!drawing) return;
+  drawing = false;
+  const pointer = activePointer; activePointer = null;
+  if (pointer !== null && canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+  const changed = history.end();
+  updateHistoryControls();
+  if (changed) saveBoard();
+}
+
+function syncBoardHeading(label) {
+  cursor = Math.max(0, Math.min(cursor, board.cells.length - 1));
+  $('scenario-name').textContent = label;
+  $('grid-size').textContent = `${board.width} × ${board.height}`;
+  describeCursor();
+}
+
+function travelHistory(direction) {
+  finishStroke();
+  const restored = history[direction]();
+  if (!restored) return;
+  board = restored;
+  syncBoardHeading('Your terrain');
+  updateHistoryControls();
+  resetSearch(direction === 'undo' ? 'Edit undone. Previous search results were cleared.' : 'Edit restored. Previous search results were cleared.', true);
+  saveBoard();
 }
 
 function pause() {
@@ -99,25 +150,34 @@ function draw() {
 }
 
 function loadBoard(next, label) {
-  board = validateBoard(next); cursor = board.start;
-  $('scenario-name').textContent = label; $('grid-size').textContent = `${board.width} × ${board.height}`;
+  finishStroke();
+  history.replace(next);
+  board = history.current; cursor = board.start;
+  syncBoardHeading(label);
+  updateHistoryControls();
   resetSearch('Terrain loaded. Run a search or edit the board.', true);
+  saveBoard();
 }
 
 function paint(index) {
   const { start, goal } = board;
+  const next = validateBoard(board);
   if (selectedTool === 'start') {
     if (index === goal) return;
-    board.start = index; board.cells[index] = 1;
+    next.start = index; next.cells[index] = 1;
   } else if (selectedTool === 'goal') {
     if (index === start) return;
-    board.goal = index; board.cells[index] = 1;
+    next.goal = index; next.cells[index] = 1;
   } else {
     if (index === start || index === goal) return;
-    board.cells[index] = selectedTool === 'wall' ? 0 : selectedTool === 'weight' ? Number($('weight').value) : 1;
+    next.cells[index] = selectedTool === 'wall' ? 0 : selectedTool === 'weight' ? Number($('weight').value) : 1;
   }
+  if (!history.replace(next)) return;
+  board = next;
   $('scenario-name').textContent = 'Your terrain';
+  updateHistoryControls();
   resetSearch('Terrain changed. Previous results were cleared.', true);
+  if (!drawing) saveBoard();
 }
 
 function pointerIndex(event) {
@@ -135,17 +195,23 @@ function describeCursor() {
 }
 
 canvas.addEventListener('pointerdown', event => {
-  if (event.button !== 0) return;
-  drawing = true; canvas.setPointerCapture(event.pointerId); cursor = pointerIndex(event);
+  if (event.button !== 0 || drawing) return;
+  drawing = true; activePointer = event.pointerId;
+  canvas.setPointerCapture(event.pointerId); history.begin(); cursor = pointerIndex(event);
   paint(cursor); describeCursor();
 });
 canvas.addEventListener('pointermove', event => {
+  if (drawing && event.pointerId !== activePointer) return;
   const next = pointerIndex(event);
   if (next === cursor) return;
   cursor = next; describeCursor();
   if (drawing) paint(cursor); else draw();
 });
-for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, () => { drawing = false; });
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, event => {
+  if (event.pointerId === activePointer) finishStroke();
+});
+window.addEventListener('blur', finishStroke);
+window.addEventListener('pagehide', finishStroke);
 canvas.addEventListener('focus', draw); canvas.addEventListener('blur', draw);
 canvas.addEventListener('keydown', event => {
   const x = cursor % board.width, y = Math.floor(cursor / board.width);
@@ -155,7 +221,7 @@ canvas.addEventListener('keydown', event => {
   if (event.key === 'ArrowRight' && x < board.width - 1) cursor++;
   if (event.key === 'ArrowUp' && y > 0) cursor -= board.width;
   if (event.key === 'ArrowDown' && y < board.height - 1) cursor += board.width;
-  if (event.key === 'Enter' || event.key === ' ') paint(cursor);
+  if (event.key === 'Enter' || event.key === ' ') { finishStroke(); paint(cursor); }
   describeCursor(); draw();
 });
 
@@ -169,12 +235,21 @@ function selectTool(tool) {
 }
 document.querySelectorAll('[data-tool]').forEach(button => button.addEventListener('click', () => selectTool(button.dataset.tool)));
 document.addEventListener('keydown', event => {
-  if (event.ctrlKey || event.metaKey || event.altKey || ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
+  if (event.altKey || event.target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
+  const key = event.key.toLowerCase();
+  if (event.ctrlKey || event.metaKey) {
+    if (key === 'z' || (key === 'y' && event.ctrlKey && !event.shiftKey)) {
+      event.preventDefault();
+      travelHistory(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+    }
+    return;
+  }
   const tool = ['wall', 'weight', 'erase', 'start', 'goal'][Number(event.key) - 1];
   if (tool) { event.preventDefault(); selectTool(tool); }
 });
 
 function prepare() {
+  finishStroke();
   if (!result || position >= result.visitedOrder.length) {
     resetSearch('Computing an expansion trace…');
     result = solve(board, $('algorithm').value);
@@ -206,6 +281,15 @@ $('run').addEventListener('click', () => {
 });
 $('step').addEventListener('click', () => { pause(); prepare(); advance(1); });
 $('reset').addEventListener('click', () => resetSearch());
+$('undo').addEventListener('click', () => travelHistory('undo'));
+$('redo').addEventListener('click', () => travelHistory('redo'));
+$('forget-saved').addEventListener('click', () => {
+  finishStroke();
+  const { status: state } = scenarioStorage.clear();
+  storageStatus(state, state === 'cleared'
+    ? 'Saved board forgotten. Your next edit saves again.'
+    : 'Could not clear browser storage. Previously saved data may remain.');
+});
 $('algorithm').addEventListener('change', () => {
   $('algorithm-note').textContent = descriptions[$('algorithm').value];
   $('insight').textContent = insights[$('algorithm').value];
@@ -221,6 +305,7 @@ $('maze').addEventListener('click', () => {
 });
 $('seed').addEventListener('keydown', event => { if (event.key === 'Enter') $('maze').click(); });
 $('export').addEventListener('click', () => {
+  finishStroke();
   const blob = new Blob([JSON.stringify(validateBoard(board), null, 2) + '\n'], { type: 'application/json' });
   const url = URL.createObjectURL(blob), anchor = document.createElement('a');
   anchor.href = url; anchor.download = 'routelab-scenario.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -237,6 +322,7 @@ $('import-file').addEventListener('change', async event => {
   finally { event.target.value = ''; }
 });
 $('compare').addEventListener('click', () => {
+  finishStroke();
   const results = ['astar', 'dijkstra', 'bfs'].map(a => solve(board, a));
   const best = Math.min(...results.filter(r => r.reached).map(r => r.cost));
   const body = $('comparison-body'); body.replaceChildren();
@@ -254,4 +340,16 @@ $('compare').addEventListener('click', () => {
   status('Comparison ready below the grid. All three algorithms used the same board.');
 });
 
+if (savedScenario.status === 'restored') {
+  syncBoardHeading('Restored local board');
+  status('Your saved board is restored. Undo history starts with this session.');
+  storageStatus('restored', 'Saved board restored from this browser.');
+} else if (savedScenario.status === 'corrupt') {
+  storageStatus('corrupt', 'Saved board was invalid. Showing the demo; your next edit replaces the saved copy.');
+} else if (savedScenario.status === 'unavailable') {
+  storageStatus('unavailable', 'Browser storage unavailable. Export JSON to keep your board.');
+} else {
+  storageStatus('empty', 'Autosave ready. Edits are saved in this browser.');
+}
+updateHistoryControls();
 draw();

@@ -5,7 +5,7 @@ import { resolve, sep, extname } from 'node:path';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
-const allowed = new Set(['index.html', 'styles.css', 'app.mjs', 'src/pathfinding.mjs']);
+const allowed = new Set(['index.html', 'styles.css', 'app.mjs', 'src/pathfinding.mjs', 'src/history.mjs', 'src/persistence.mjs']);
 
 export function createServer() {
   return http.createServer(async (request, response) => {

@@ -21,6 +21,10 @@ test('server serves only the explicit frontend assets and rejects unsafe request
   assert.equal(page.headers['x-content-type-options'], 'nosniff');
   const module = await request('/src/pathfinding.mjs');
   assert.equal(module.status, 200); assert.match(module.headers['content-type'], /javascript/);
+  for (const path of ['/src/history.mjs', '/src/persistence.mjs']) {
+    const asset = await request(path);
+    assert.equal(asset.status, 200); assert.match(asset.headers['content-type'], /javascript/);
+  }
   for (const path of ['/package.json', '/README.md', '/../package.json', '/%2e%2e%2fpackage.json', '/..%5cpackage.json', '/%2fetc/passwd', '/missing']) {
     assert.equal((await request(path)).status, 404, path);
   }

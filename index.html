@@ -8,7 +8,7 @@
 <body>
   <header class="site-header wrap">
     <a class="brand" href="./" aria-label="RouteLab home"><span class="brand-mark">↗</span>route<span>lab</span><small>ALGORITHM STUDIO</small></a>
-    <div class="header-note"><span class="live-dot"></span> Runs entirely in your browser <span class="version">v1.0</span></div>
+    <div class="header-note"><span class="live-dot"></span> Runs entirely in your browser <span class="version">v1.1</span></div>
   </header>
   <main class="wrap">
     <section class="intro">
@@ -33,12 +33,22 @@
         <label class="field-label weight-control" for="weight">Terrain cost <output id="weight-value">5</output></label>
         <input id="weight" type="range" min="2" max="9" value="5">
         <p class="hint">Click or drag to paint. Each move pays the destination cell's cost.</p>
+        <div class="history-controls" role="group" aria-label="Editor history">
+          <button id="undo" class="secondary" disabled title="Undo — Ctrl/Cmd+Z" aria-keyshortcuts="Control+z Meta+z">↶ Undo</button>
+          <button id="redo" class="secondary" disabled title="Redo — Ctrl/Cmd+Shift+Z or Ctrl+Y" aria-keyshortcuts="Control+Shift+z Meta+Shift+z Control+y">Redo ↷</button>
+        </div>
+        <p class="hint history-help">Each drag is one edit. Undo: Ctrl/⌘ Z.<br>Redo: Ctrl/⌘ Shift Z or Ctrl Y.</p>
         <div class="divider"></div>
         <label class="field-label" for="seed">Reproducible maze</label>
         <div class="seed-row"><input id="seed" value="copper-fox" maxlength="80" aria-label="Maze seed"><button id="maze" class="icon-button" title="Generate maze" aria-label="Generate maze">↻</button></div>
         <div class="mini-actions"><button id="demo">Load demo</button><button id="clear">Clear board</button></div>
         <div class="divider"></div>
         <div class="mini-actions"><button id="export">↓ Export JSON</button><button id="import">↑ Import JSON</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+        <div class="storage-panel">
+          <p id="storage-status" class="hint" role="status" aria-live="polite">Checking saved board…</p>
+          <button id="forget-saved" type="button">Forget saved board</button>
+          <p class="hint">Keeps this canvas open. Your next edit saves again. Export JSON for a portable copy.</p>
+        </div>
       </aside>
       <div class="workspace">
         <div class="board-heading"><div><span class="panel-label">02 / EXPLORE THE GRID</span><h2 id="scenario-name">The expensive shortcut</h2></div><span class="grid-size" id="grid-size">31 × 21</span></div>
